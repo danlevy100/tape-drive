@@ -1,13 +1,13 @@
 /*
- * Simple demo, should work with any driver board
+ * Dan Levy, September 2021.
  *
- * Connect STEP, DIR as indicated
+ * WIS lab tape drive control code.
+ * 
+ * This program controls the two stepper motors 
+ * and synchronizes them so that the tension in the tape is maintained constant.
  *
- * Copyright (C)2015-2017 Laurentiu Badea
- *
- * This file may be redistributed under the terms of the MIT license.
- * A copy of this license has been included with this distribution in the file LICENSE.
  */
+ 
 #include <Arduino.h>
 #include "BasicStepperDriver.h"
 #include "MultiDriver.h"
@@ -17,13 +17,16 @@
 
 // The pins for the optical encoder
 Encoder myEnc(7,6);
-long counter = 0;
+// Encoder counter. Total number of counts is about 44000. I take a maximum of 40000.
+long counter = 0; 
 
-int setpoint = 5000;
+// Initial tension set point in percent.
+unsigned int setpoint_percent = 25;
+unsigned int setpoint = setpoint_percent * 40000/100;
 
 // Motor steps per revolution. Most steppers are 200 steps or 1.8 degrees/step
 #define MOTOR_STEPS 200
-#define RPM 1500
+#define RPM 15
 
 // Since microstepping is set externally, make sure this matches the selected mode
 // If it doesn't, the motor will move at a different RPM than chosen
@@ -46,7 +49,7 @@ BasicStepperDriver bottom_stepper(MOTOR_STEPS, bottom_DIR, bottom_STEP, bottom_S
 
 MultiDriver controller(top_stepper, bottom_stepper);
 
-float Kp=0.05, Ki=0.005, Kd=0, Hz=1;
+float Kp=0.05, Ki=0.001, Kd=0, Hz=1;
 int output_bits = 16;
 bool output_signed = true;
 long output;
@@ -58,6 +61,11 @@ void setup() {
     bottom_stepper.begin(RPM, MICROSTEPS);    
     // if using enable/disable on ENABLE pin (active LOW) instead of SLEEP uncomment next line
     // stepper.setEnableActiveState(LOW);
+
+    // Release tension and set counter to zero
+    controller.rotate(-100, 100);
+    delay(500);
+    myEnc.readAndReset();
     
 }
 
@@ -66,24 +74,32 @@ void loop() {
     // pause and allow the motor to be moved by hand
     //bottom_stepper.disable();    
 
+    // Get user input for tension (encoder position) setpoint
     if (Serial.available()) {
-      setpoint = Serial.parseInt();
-      Serial.readString();      
+      setpoint_percent = Serial.readString().toInt();
+      setpoint = setpoint_percent * 40000/100;      
     }
     
-    int feedback = counter/2;
-    float error = setpoint-feedback;
+    long feedback = counter;
+    long error = setpoint-feedback;
+    
+    float feedback_percent = feedback*100/40000;
 
     if (abs(error/setpoint)>0.1) {      
-      output = abs(error)/error;
+      output = abs(error)/error;      
     }
     else {
-      output = myPID.step(setpoint, feedback) / 100;    
+      output = myPID.step(setpoint, feedback) / 200;   
     }   
     
     counter = myEnc.read();
-       
-    Serial.println(feedback);   
+          
+    //Serial.print("Set point: ");
+    //Serial.println(setpoint);
+    //Serial.print("Feedback: ");
+    Serial.println(feedback_percent);
+    //Serial.print("Output: ");
+    //Serial.println(output); 
     
-    controller.rotate(-7.2+output, -7.2);   
+    controller.rotate(7.2, 7.2-output);   
 }
