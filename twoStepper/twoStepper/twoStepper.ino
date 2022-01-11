@@ -54,6 +54,8 @@ int output_bits = 16;
 bool output_signed = true;
 long output;
 
+int act = 0;
+
 unsigned long int loop_start_time;
 
 FastPID myPID(Kp, Ki, Kd, Hz, output_bits, output_signed);
@@ -67,52 +69,24 @@ void setup() {
 
     // Release tension and set counter to zero
     controller.rotate(-10, 10);
-    delay(500);
+    delay(500);    
     myEnc.readAndReset();
-    
+
+    top_stepper.disable();
+    bottom_stepper.disable();
 }
 
-void loop() { 
-
-    loop_start_time = millis();
-
-    if (Serial.available()>0) {      
-      String cmd = Serial.readString();
-      Serial.println(cmd);
-    }    
-    /*
-    // pause and allow the motor to be moved by hand
-    //bottom_stepper.disable();    
-
-    // Get user input for tension (encoder position) setpoint
-    //if (Serial.available()) {
-    //  setpoint_percent = Serial.readString().toInt();
-    //  setpoint = setpoint_percent * 40000/100;      
-    //}
+void step_forward() {
     
     long feedback = counter;
     float error = setpoint-feedback;
     
-    //float feedback_percent = feedback*100/40000;
-
-    /*if (abs(error/setpoint)>0.1) {      
-      output = 100*abs(error)/error;
-    }
-    else {
-      output = myPID.step(setpoint, feedback);   
-    }*/   
+    // float feedback_percent = feedback*100/40000;
     
-    /*
-    counter = myEnc.read();
-          
-    //Serial.print("Set point: ");
-    //Serial.println(setpoint);
-    //Serial.print("Error: ");
-    //Serial.println(error);
-    //Serial.print("Feedback: ");
-    Serial.println(feedback);
-    //Serial.print("Output: ");
-    //Serial.println(output*0.05);       
+    
+    counter = myEnc.read();          
+   
+    Serial.println(feedback);     
     
     if (counter>30000) {
       Serial.println("End of tape!");
@@ -121,55 +95,91 @@ void loop() {
       Serial.readString();
       windTop();      
     }
-    else {     
-      controller.rotate(-12.0, -12.0);      
-      
-      Serial.println(feedback);
-      
-      if (feedback<setpoint*0.9) {
-        while (feedback<setpoint) {      
-          counter = myEnc.read();
-          feedback = counter;
-          if (counter > 30000) {
-            break;        
-          }              
-          bottom_stepper.rotate(-3.6);
-        }
+       
+    controller.rotate(-12.0, -12.0);           
+    
+    if (feedback<setpoint*0.9) {
+      while (feedback<setpoint) {      
+        counter = myEnc.read();
+        feedback = counter;
+        if (counter > 30000) {
+          break;        
+        }              
+        bottom_stepper.rotate(-3.6);         
       }
-  
-      if (feedback>setpoint*1.1) {
-        while (feedback>setpoint*0.9) {          
-          counter = myEnc.read();
-          feedback = counter;
-          if (counter > 30000) {
-            break;
-          }
-          top_stepper.rotate(-3.6);
+    }
+
+    if (feedback>setpoint*1.1) {
+      while (feedback>setpoint*1) {          
+        counter = myEnc.read();
+        feedback = counter;
+        if (counter > 30000) {
+          break;
         }
+        top_stepper.rotate(-1.2);        
       }
+    }    
   
-      //delay(100-(millis()-loop_start_time));
-      //delay(1000-(millis()-loop_start_time));
-      //delay(1000);
-      
-  
-      /*
-      
-      bottom_stepper.disable();
-      
-      top_stepper.rotate(15.0);
-  
-      bottom_stepper.enable();
-      bottom_stepper.rotate(15.0);       
-    }*/  
 }
 
-
 void windTop() {
-    top_stepper.setRPM(120);      
-    bottom_stepper.setRPM(120);            
-    while (counter < 35000) {
-      controller.rotate(3.6, 3.6);      
-      counter = myEnc.read();
+    top_stepper.setRPM(120);
+    bottom_stepper.disable();
+    while (counter < 20000) {      
+      top_stepper.rotate(3.6);            
+      counter = myEnc.read();      
     }
+    controller.rotate(-7.2,0.0);
+    bottom_stepper.enable();
+}
+
+void loop() { 
+
+    loop_start_time = millis();
+
+    if (Serial.available()) {      
+      String cmd = Serial.readStringUntil('\n');
+      Serial.println(cmd);
+
+      if (cmd.equals("wind_top")) {        
+        windTop();    
+      }
+
+      if (cmd.equals("downward")) {
+        top_stepper.enable();
+        bottom_stepper.enable();
+        
+        // Release tension and set counter to zero
+        controller.rotate(-10, 10);
+        delay(500);
+        myEnc.readAndReset();  
+        
+        act = 1;
+      }
+      if (cmd.equals("stop")) {
+        top_stepper.disable();
+        bottom_stepper.disable();
+        act = 0;
+      }
+    }
+
+    if (act == 1) {
+      step_forward();  
+    }    
+    
+    /*
+    // pause and allow the motor to be moved by hand
+    //bottom_stepper.disable();    
+
+    // Get user input for tension (encoder position) setpoint
+    //if (Serial.available()) {
+    //  setpoint_percent = Serial.readString().toInt();
+    //  setpoint = setpoint_percent * 40000/100;      
+    //}*/
+    
+
+
+    //delay(100-(millis()-loop_start_time));
+    delay(1000-(millis()-loop_start_time));
+    //delay(1000);        
 }
