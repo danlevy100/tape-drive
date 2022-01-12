@@ -15,6 +15,9 @@
 #include <Encoder.h>
 #include <FastPID.h>
 
+#define INPUT_SIZE 30
+int direct = 1;
+
 // The pins for the optical encoder
 Encoder myEnc(7,6);
 // Encoder counter. Total number of counts is about 44000. I take a maximum of 40000.
@@ -62,6 +65,7 @@ FastPID myPID(Kp, Ki, Kd, Hz, output_bits, output_signed);
 
 void setup() {    
     Serial.begin(9600);
+    Serial.setTimeout(10);
     top_stepper.begin(RPM, MICROSTEPS);
     bottom_stepper.begin(RPM, MICROSTEPS);    
     // if using enable/disable on ENABLE pin (active LOW) instead of SLEEP uncomment next line
@@ -76,27 +80,30 @@ void setup() {
     bottom_stepper.disable();
 }
 
-void step_forward() {
+
+
+
+void step(int direct) {
     
     long feedback = counter;
     float error = setpoint-feedback;
     
-    // float feedback_percent = feedback*100/40000;
-    
+    // float feedback_percent = feedback*100/40000;   
     
     counter = myEnc.read();          
    
-    Serial.println(feedback);     
+    Serial.print("Feedback: ");
+    Serial.println(feedback);   
     
-    if (counter>30000) {
+    /*if (counter>30000) {
       Serial.println("End of tape!");
       while (Serial.available() == 0) {
       }
       Serial.readString();
-      windTop();      
-    }
+      wind_up();      
+    }*/
        
-    controller.rotate(-12.0, -12.0);           
+    controller.rotate(-12.0*direct, -12.0*direct);           
     
     if (feedback<setpoint*0.9) {
       while (feedback<setpoint) {      
@@ -105,7 +112,11 @@ void step_forward() {
         if (counter > 30000) {
           break;        
         }              
-        bottom_stepper.rotate(-3.6);         
+        if (direct == 1) {
+          bottom_stepper.rotate(-3.6);         
+        } else {
+          top_stepper.rotate(3.6);
+        }
       }
     }
 
@@ -116,13 +127,18 @@ void step_forward() {
         if (counter > 30000) {
           break;
         }
-        top_stepper.rotate(-1.2);        
+        if (direct == 1) {
+          top_stepper.rotate(-1.2);                    
+        } else {
+          bottom_stepper.rotate(1.2);
+        }
+        
       }
     }    
   
 }
 
-void windTop() {
+void wind_up() {
     top_stepper.setRPM(120);
     bottom_stepper.disable();
     while (counter < 20000) {      
@@ -136,16 +152,36 @@ void windTop() {
 void loop() { 
 
     loop_start_time = millis();
-
+    
     if (Serial.available()) {      
-      String cmd = Serial.readStringUntil('\n');
-      Serial.println(cmd);
+      //String cmd = Serial.readStringUntil(':'); // Format is command:direction:speed:    
+      //String direct = Serial.readStringUntil(':');
+          
+      //Serial.println(cmd);
+      //Serial.println(direct);     
 
-      if (cmd.equals("wind_top")) {        
-        windTop();    
+      // Get next command from Serial (add 1 for final 0)
+      char input[INPUT_SIZE + 1];
+      byte size = Serial.readBytes(input, INPUT_SIZE);
+      // Add the final 0 to end the C string
+      input[size] = 0;
+      
+      // Read command
+      char* token = strtok(input, ":");     
+      String cmd = token;
+      Serial.println(cmd);
+      token = strtok(NULL, ":");      
+      direct = atoi(token);            
+      Serial.println(direct);
+      //token = strtok(NULL, ":");
+      //int rot_speed = atoi(token);               
+      //Serial.println(rot_speed);      
+      
+      if (cmd.equals("wind_up")) {        
+        wind_up();    
       }
 
-      if (cmd.equals("downward")) {
+      if (cmd.equals("step")) {
         top_stepper.enable();
         bottom_stepper.enable();
         
@@ -164,21 +200,11 @@ void loop() {
     }
 
     if (act == 1) {
-      step_forward();  
+      Serial.println("Rotate 1 Hz");
+      step(direct);
+      act = 0; 
     }    
     
-    /*
-    // pause and allow the motor to be moved by hand
-    //bottom_stepper.disable();    
-
-    // Get user input for tension (encoder position) setpoint
-    //if (Serial.available()) {
-    //  setpoint_percent = Serial.readString().toInt();
-    //  setpoint = setpoint_percent * 40000/100;      
-    //}*/
-    
-
-
     //delay(100-(millis()-loop_start_time));
     delay(1000-(millis()-loop_start_time));
     //delay(1000);        
