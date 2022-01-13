@@ -57,7 +57,6 @@ int output_bits = 16;
 bool output_signed = true;
 long output;
 
-int act = 0;
 
 unsigned long int loop_start_time;
 
@@ -138,9 +137,12 @@ void step(int direct) {
   
 }
 
-void wind_up() {
+void fast_forward() {
+    Serial.println("Fast forward");
     top_stepper.setRPM(120);
+    top_stepper.enable();
     bottom_stepper.disable();
+    
     while (counter < 20000) {      
       top_stepper.rotate(3.6);            
       counter = myEnc.read();      
@@ -151,7 +153,7 @@ void wind_up() {
 
 void loop() { 
 
-    loop_start_time = millis();
+    //loop_start_time = millis();
     
     if (Serial.available()) {      
       //String cmd = Serial.readStringUntil(':'); // Format is command:direction:speed:    
@@ -177,35 +179,28 @@ void loop() {
       //int rot_speed = atoi(token);               
       //Serial.println(rot_speed);      
       
-      if (cmd.equals("wind_up")) {        
-        wind_up();    
+      if (cmd.equals("fast_forward")) {        
+        fast_forward();    
       }
 
-      if (cmd.equals("step")) {
+      else if (cmd.equals("step")) {
         top_stepper.enable();
         bottom_stepper.enable();
         
         // Release tension and set counter to zero
-        controller.rotate(-10, 10);
-        delay(500);
-        myEnc.readAndReset();  
+        //controller.rotate(-5, 5);
+        // delay(50);
+        //myEnc.readAndReset();  
+        step(direct);
         
-        act = 1;
       }
-      if (cmd.equals("stop")) {
+      else if (cmd.equals("stop")) {
         top_stepper.disable();
-        bottom_stepper.disable();
-        act = 0;
+        bottom_stepper.disable();        
       }
     }
-
-    if (act == 1) {
-      Serial.println("Rotate 1 Hz");
-      step(direct);
-      act = 0; 
-    }    
     
     //delay(100-(millis()-loop_start_time));
-    delay(1000-(millis()-loop_start_time));
+    //delay(1000-(millis()-loop_start_time));
     //delay(1000);        
 }

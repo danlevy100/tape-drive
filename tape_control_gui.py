@@ -3,7 +3,7 @@ import serial
 
 import time
 
-def step(cmd):    
+def step(cmd, delay):    
 
     t_start = time.time()    
     ser.write(bytes(cmd, 'utf-8'))    
@@ -18,7 +18,7 @@ sg.theme('Dark Amber')  # Let's set our own color theme
 
 # STEP 1 define the layout
 layout = [ 
-            [sg.Text('Mode'), sg.Combo(['Single step', 'Continuous'], key='-MODE-', default_value='Single step')],        
+            [sg.Text('Mode'), sg.Combo(['Single step', 'Continuous', 'Fast forward'], key='-MODE-', default_value='Single step')],
             [sg.Text('Rotation direction'), sg.Combo(['Top to bottom', 'Bottom to top'], key='-DIRECT-', default_value='Top to bottom')],            
             [sg.Button('Start', key='-START-'), sg.Button('Stop', key='-STOP-')],            
             [sg.Button('Exit', key = '-EXIT-')]
@@ -39,17 +39,24 @@ while True:
         break
     
     if event == '-START-':      
-        if values['-DIRECT-'] == 'Top to bottom':
+        if values['-DIRECT-'] == 'Top to bottom':   
             direct = 1
         else:
             direct = -1               
                 
         continuous = True if values['-MODE-'] == 'Continuous' else False
-        single_step = False if values['-MODE-'] == 'Continuous' else True
+        single_step = True if values['-MODE-'] == 'Single step' else False
+        fast_forward = True if values['-MODE-'] == 'Fast forward' else False
         
-        cmd = 'step:' + str(direct)              
+        delay = 1
         
-        window.perform_long_operation(lambda: step(cmd), '-STEP DONE-')        
+        if continuous or single_step:
+            cmd = 'step:' + str(direct)
+            
+        elif fast_forward:
+            cmd = 'fast_forward:'
+        
+        window.perform_long_operation(lambda: step(cmd, delay), '-STEP DONE-')        
     
     elif event == '-STOP-':
       print('You pressed the STOP button')          
@@ -58,7 +65,7 @@ while True:
       
     elif event == '-STEP DONE-':
         if continuous:
-            window.perform_long_operation(lambda: step(cmd), '-STEP DONE-')        
+            window.perform_long_operation(lambda: step(cmd, delay), '-STEP DONE-')        
         elif single_step:
             pass
         else:
