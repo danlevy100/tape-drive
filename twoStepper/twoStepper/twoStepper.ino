@@ -17,6 +17,7 @@
 
 #define INPUT_SIZE 30
 int direct = 1;
+bool fast_forward = false;
 
 // The pins for the optical encoder
 Encoder myEnc(7,6);
@@ -24,8 +25,7 @@ Encoder myEnc(7,6);
 long counter = 0; 
 
 // Initial tension set point in percent.
-unsigned int setpoint_percent = 25;
-unsigned int setpoint = 10000;
+unsigned int setpoint = 20000;
 
 // Motor steps per revolution. Most steppers are 200 steps or 1.8 degrees/step
 #define MOTOR_STEPS 200
@@ -70,29 +70,19 @@ void setup() {
     // if using enable/disable on ENABLE pin (active LOW) instead of SLEEP uncomment next line
     // stepper.setEnableActiveState(LOW);
 
-    // Release tension and set counter to zero
-    controller.rotate(-10, 10);
-    delay(500);    
-    myEnc.readAndReset();
+    // Release tension and set counter to zero    
+    release_tension();
 
     top_stepper.disable();
     bottom_stepper.disable();
 }
 
-
-
-
-void step(int direct) {
+void single_step(int direct) {
     
-    long feedback = counter;
-    float error = setpoint-feedback;
+    top_stepper.setRPM(60);
+    bottom_stepper.setRPM(60);      
     
-    // float feedback_percent = feedback*100/40000;   
-    
-    counter = myEnc.read();          
-   
-    Serial.print("Feedback: ");
-    Serial.println(feedback);   
+    counter = myEnc.read();   
     
     /*if (counter>30000) {
       Serial.println("End of tape!");
@@ -104,10 +94,9 @@ void step(int direct) {
        
     controller.rotate(-12.0*direct, -12.0*direct);           
     
-    if (feedback<setpoint*0.9) {
-      while (feedback<setpoint) {      
-        counter = myEnc.read();
-        feedback = counter;
+    if (counter<setpoint*0.9) {
+      while (counter<setpoint) {      
+        counter = myEnc.read();        
         if (counter > 30000) {
           break;        
         }              
@@ -119,10 +108,9 @@ void step(int direct) {
       }
     }
 
-    if (feedback>setpoint*1.1) {
-      while (feedback>setpoint*1) {          
-        counter = myEnc.read();
-        feedback = counter;
+    if (counter>setpoint*1.1) {
+      while (counter>setpoint) {          
+        counter = myEnc.read();        
         if (counter > 30000) {
           break;
         }
@@ -137,27 +125,49 @@ void step(int direct) {
   
 }
 
-void fast_forward() {
-    Serial.println("Fast forward");
-    top_stepper.setRPM(120);
-    top_stepper.enable();
-    bottom_stepper.disable();
-    
-    while (counter < 20000) {      
+void ff_step(int direct) {
+        
+    if (direct == -1) {     
+      top_stepper.enable();
+      bottom_stepper.disable();    
       top_stepper.rotate(3.6);            
-      counter = myEnc.read();      
-    }
-    controller.rotate(-7.2,0.0);
-    bottom_stepper.enable();
+    
+    } else if (direct == 1) {         
+      bottom_stepper.enable();      
+      top_stepper.disable();    
+      bottom_stepper.rotate(-3.6);    
+    }    
 }
 
-void loop() { 
+void release_tension() {
+  top_stepper.enable();
+  bottom_stepper.enable();
 
-    //loop_start_time = millis();
+  long counter_before = myEnc.read();
+  long counter_after = counter_before + 1;
+
+  while (counter_before != counter_after) { 
+    counter_before = myEnc.read();
+    controller.rotate(-1, 1);   
+    counter_after = myEnc.read();    
+  } 
+  
+  //controller.rotate(-30, 30);
+  top_stepper.disable();
+  bottom_stepper.disable();
+  myEnc.readAndReset();  
+}
+
+void loop() {
+    
+    // Get user input, format is command:direction
+    
+    counter = myEnc.read();
+    Serial.println(counter);   
     
     if (Serial.available()) {      
       //String cmd = Serial.readStringUntil(':'); // Format is command:direction:speed:    
-      //String direct = Serial.readStringUntil(':');
+      //String direct = Serial.readStringUntil(':');   
           
       //Serial.println(cmd);
       //Serial.println(direct);     
@@ -171,36 +181,46 @@ void loop() {
       // Read command
       char* token = strtok(input, ":");     
       String cmd = token;
-      Serial.println(cmd);
+      //Serial.println(cmd);
       token = strtok(NULL, ":");      
       direct = atoi(token);            
-      Serial.println(direct);
+      //Serial.println(direct);
       //token = strtok(NULL, ":");
       //int rot_speed = atoi(token);               
-      //Serial.println(rot_speed);      
+      //Serial.println(rot_speed);     
+
+      // Deal with command
       
-      if (cmd.equals("fast_forward")) {        
-        fast_forward();    
+      if (cmd == "ff_step") {
+        fast_forward = true;
+        top_stepper.setRPM(120);        
+        bottom_stepper.setRPM(120);        
       }
 
-      else if (cmd.equals("step")) {
+      else if (cmd == "single_step") {
         top_stepper.enable();
-        bottom_stepper.enable();
+        bottom_stepper.enable();       
         
         // Release tension and set counter to zero
         //controller.rotate(-5, 5);
         // delay(50);
         //myEnc.readAndReset();  
-        step(direct);
-        
+        single_step(direct);
+
+        fast_forward = false;        
       }
-      else if (cmd.equals("stop")) {
+      else if (cmd == "stop") {
         top_stepper.disable();
-        bottom_stepper.disable();        
+        bottom_stepper.disable();
+        fast_forward = false;        
+      }
+      else if (cmd == "release_tension") {
+        release_tension();
       }
     }
-    
-    //delay(100-(millis()-loop_start_time));
-    //delay(1000-(millis()-loop_start_time));
-    //delay(1000);        
+
+    else if (fast_forward) {
+      ff_step(direct);      
+    }
+      
 }
