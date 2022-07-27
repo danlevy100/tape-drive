@@ -15,7 +15,7 @@ The tape tension is maintained by two stepper motors and a spring. To increase t
 
 - Motors: Arun microelectronics (AML) D42.1 UHV Stepper Motor, 180mNm, Radiation hardened.
 - Linear optical encoder: Celera Motion Mercury 1500V.
-- The tape itself: $5\,\rm\mu m$ stainless steel, 1.27 inch wide, 50 m long. Sold by Maton Metals (Israel).
+- The tape itself: $5\rm\mu m$ stainless steel, 12.7 mm wide, 50 m long. Sold by Maton Metals (Israel).
 - 
 
 
