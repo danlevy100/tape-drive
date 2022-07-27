@@ -13,19 +13,19 @@
 #include "MultiDriver.h"
 #include "SyncDriver.h"
 #include <Encoder.h>
-#include <FastPID.h>
 
 #define INPUT_SIZE 30
 int direct = 1;
 bool fast_forward = false;
+bool EOT = false; 
 
 // The pins for the optical encoder
 Encoder myEnc(7,6);
-// Encoder counter. Total number of counts is about 44000. I take a maximum of 40000.
-long counter = 0; 
+// Encoder encoder_reading. Total number of counts is about 44000. I take a maximum of 40000.
+//long encoder_reading = 0; 
 
 // Initial tension set point in percent.
-unsigned int setpoint = 20000;
+//unsigned int encoder_setpoint;
 
 // Motor steps per revolution. Most steppers are 200 steps or 1.8 degrees/step
 #define MOTOR_STEPS 200
@@ -52,16 +52,6 @@ BasicStepperDriver bottom_stepper(MOTOR_STEPS, bottom_DIR, bottom_STEP, bottom_S
 
 MultiDriver controller(top_stepper, bottom_stepper);
 
-float Kp=10, Ki=2, Kd=0, Hz=1;
-int output_bits = 16;
-bool output_signed = true;
-long output;
-
-
-unsigned long int loop_start_time;
-
-FastPID myPID(Kp, Ki, Kd, Hz, output_bits, output_signed);
-
 void setup() {    
     Serial.begin(9600);
     Serial.setTimeout(10);
@@ -70,36 +60,23 @@ void setup() {
     // if using enable/disable on ENABLE pin (active LOW) instead of SLEEP uncomment next line
     // stepper.setEnableActiveState(LOW);
 
-    // Release tension and set counter to zero    
+    // Release tension and set encoder_reading to zero    
     release_tension();
 
     top_stepper.disable();
     bottom_stepper.disable();
 }
 
-void single_step(int direct) {
+void single_step(int direct, long encoder_reading, unsigned int encoder_setpoint) {    
     
     top_stepper.setRPM(60);
-    bottom_stepper.setRPM(60);      
-    
-    counter = myEnc.read();   
-    
-    /*if (counter>30000) {
-      Serial.println("End of tape!");
-      while (Serial.available() == 0) {
-      }
-      Serial.readString();
-      wind_up();      
-    }*/
-       
+    bottom_stepper.setRPM(60);
+           
     controller.rotate(-12.0*direct, -12.0*direct);           
     
-    if (counter<setpoint*0.9) {
-      while (counter<setpoint) {      
-        counter = myEnc.read();        
-        if (counter > 30000) {
-          break;        
-        }              
+    if (encoder_reading<encoder_setpoint*0.9) {
+      while (encoder_reading<encoder_setpoint) {      
+        encoder_reading = myEnc.read();        
         if (direct == 1) {
           bottom_stepper.rotate(-3.6);         
         } else {
@@ -108,21 +85,29 @@ void single_step(int direct) {
       }
     }
 
-    if (counter>setpoint*1.1) {
-      while (counter>setpoint) {          
-        counter = myEnc.read();        
-        if (counter > 30000) {
-          break;
-        }
+    else if (encoder_reading>encoder_setpoint*1.1) {
+            
+      while (encoder_reading>encoder_setpoint) {                  
         if (direct == 1) {
           top_stepper.rotate(-1.2);                    
         } else {
-          bottom_stepper.rotate(1.2);
+          bottom_stepper.rotate(1.2);          
         }
-        
+        long new_encoder_reading = myEnc.read();                
+        if (new_encoder_reading < encoder_reading * 1.1) {
+          encoder_reading = new_encoder_reading; // Tension was properly released
+          EOT = false;
+        } else {
+          // End of tape reached          
+          EOT = true;
+          break;
+        }        
       }
-    }    
-  
+    }
+
+    else {
+      EOT = false;
+    }
 }
 
 void ff_step(int direct) {
@@ -130,7 +115,7 @@ void ff_step(int direct) {
     if (direct == -1) {     
       top_stepper.enable();
       bottom_stepper.disable();    
-      top_stepper.rotate(3.6);            
+      top_stepper.rotate(3.6);        
     
     } else if (direct == 1) {         
       bottom_stepper.enable();      
@@ -143,13 +128,13 @@ void release_tension() {
   top_stepper.enable();
   bottom_stepper.enable();
 
-  long counter_before = myEnc.read();
-  long counter_after = counter_before + 1;
+  long encoder_reading_before = myEnc.read();
+  long encoder_reading_after = encoder_reading_before + 1;
 
-  while (counter_before != counter_after) { 
-    counter_before = myEnc.read();
+  while (encoder_reading_before != encoder_reading_after) { 
+    encoder_reading_before = myEnc.read();
     controller.rotate(-1, 1);   
-    counter_after = myEnc.read();    
+    encoder_reading_after = myEnc.read();    
   } 
   
   //controller.rotate(-30, 30);
@@ -162,11 +147,13 @@ void loop() {
     
     // Get user input, format is command:direction
     
-    counter = myEnc.read();
-    Serial.println(counter);   
+    long encoder_reading = myEnc.read();
+    String transmit_response = ""; 
+    transmit_response = transmit_response + encoder_reading + "," + EOT;
+    Serial.println(transmit_response);   
     
     if (Serial.available()) {      
-      //String cmd = Serial.readStringUntil(':'); // Format is command:direction:speed:    
+      //String cmd = Serial.readStringUntil(':'); // Format is command:direction:tension:    
       //String direct = Serial.readStringUntil(':');   
           
       //Serial.println(cmd);
@@ -181,13 +168,11 @@ void loop() {
       // Read command
       char* token = strtok(input, ":");     
       String cmd = token;
-      //Serial.println(cmd);
       token = strtok(NULL, ":");      
       direct = atoi(token);            
-      //Serial.println(direct);
-      //token = strtok(NULL, ":");
-      //int rot_speed = atoi(token);               
-      //Serial.println(rot_speed);     
+      token = strtok(NULL, ":");
+      long encoder_setpoint = atoi(token);
+      encoder_setpoint = encoder_setpoint * 40000 / 100; // Convert from percent to real encoder values              
 
       // Deal with command
       
@@ -201,11 +186,7 @@ void loop() {
         top_stepper.enable();
         bottom_stepper.enable();       
         
-        // Release tension and set counter to zero
-        //controller.rotate(-5, 5);
-        // delay(50);
-        //myEnc.readAndReset();  
-        single_step(direct);
+        single_step(direct, encoder_reading, encoder_setpoint);
 
         fast_forward = false;        
       }
@@ -219,8 +200,12 @@ void loop() {
       }
     }
 
-    else if (fast_forward) {
-      ff_step(direct);      
+    else if (fast_forward && !EOT) {      
+      if ( ((encoder_reading > 35000) and (direct==1)) or ((encoder_reading > 25000) and (direct==-1)) ) {
+        EOT = true;
+      } else {
+        ff_step(direct);
+      }
     }
       
 }
