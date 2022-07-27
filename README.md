@@ -11,6 +11,13 @@ To the best of my knowledge, these two features are unique and differentiate thi
 
 ## Implementation
 ### Hardware
+The tape tension is maintained by two stepper motors and a spring. To increase the tension, the motors turn in such a way that the spring compresses and pushes on the sliding block. Once the desired tension (or block position) is reached, the motors stop and resist any further motion. The block position is monitored by a linear optical encoder.
+
+- Motors: Arun microelectronics (AML) D42.1 UHV Stepper Motor, 180mNm, Radiation hardened.
+- Linear optical encoder: Celera Motion Mercury 1500V.
+- The tape itself: $5\,\rm\mu m$ stainless steel, 1.27 inch wide, 50 m long. Sold by Maton Metals (Israel).
+- 
+
 
 
 ### Software
