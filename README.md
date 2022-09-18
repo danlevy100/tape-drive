@@ -32,6 +32,6 @@ The tape tension is maintained by two stepper motors and a spring. To increase t
 - A laser distance measuring device (Acuity AR700-6) sits outside the chamber and measures the distance to the tape.
 - The tape is moved accordingly.
 
-## Credits
-LOA: Thomas Lavergne, Alessandro Flacco
-WIS: Noam Inbari, Alex Roich
+## Acknowledgements
+LOA: Thomas Lavergne, Alessandro Flacco.
+WIS: Noam Inbari, Alex Roich.
