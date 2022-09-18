@@ -3,6 +3,9 @@
 The smart tape drive is used for laser-plasma ion acceleration from thin foils. It was conceived during my PhD.
 The tape refreshes the foil after each shot, thus allowing for operation at the repetition rate of the laser.
 
+![image](https://user-images.githubusercontent.com/77229620/190892208-cdf41c67-2c24-4098-807b-cfe0f13edb1f.png)
+
+
 The "smart" part involves two closed feedback control loops:
 1. Tape tension, for maintaining precise value such that the tape does not break or bend.
 2. Tape positioning with respect to the laser focus, so that conditions are constant when the tape is rolling.
