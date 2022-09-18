@@ -12,7 +12,7 @@ The "smart" part involves two closed feedback control loops:
 
 To the best of my knowledge, these two features are unique and differentiate this tape from other similar tapes.
 
-![image](https://user-images.githubusercontent.com/77229620/190892334-1a1c3c07-ff6f-4d3e-ad94-56581487ed57.png)
+![image](https://user-images.githubusercontent.com/77229620/190892389-40d65123-9292-4f73-841d-5dab0cf151e5.png)
 
 ## Implementation
 ### Tape tension
