@@ -25,7 +25,7 @@ The tape tension is maintained by two stepper motors and a spring. To increase t
 
 #### Software
 - The motors are controlled by an Arduino connected to a stepper motor driver.
-- A Python GUI communicates with the Arduino over the serial port.
+- A Python GUI ('tape_control_gui.py') communicates with the Arduino over the serial port.
 
 ### Tape positioning
 - A UHV piezo stage (Newport AG-LS25V6) is mounted such that it moves the tape into and out of focus.
