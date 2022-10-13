@@ -24,7 +24,7 @@ The tape tension is maintained by two stepper motors and a spring. To increase t
 - The tape itself: 5 $\rm\mu m$ stainless steel, 12.7 mm wide, 50 m long. Sold by Maton Metals (Israel). Testing was done with a standard VHS tape.
 
 #### Software
-- The motors are controlled by an Arduino connected to a stepper motor driver.
+- The motors are controlled by an Arduino connected to a stepper motor driver (`twoStepper.ino`).
 - A Python GUI (`tape_control_gui.py`) communicates with the Arduino over the serial port.
 
 ### Tape positioning
