@@ -17,7 +17,7 @@
 #define INPUT_SIZE 30
 int direct = 1;
 bool fast_forward = false;
-bool EOT = false; 
+
 
 // The pins for the optical encoder
 Encoder myEnc(7,6);
@@ -53,7 +53,7 @@ BasicStepperDriver bottom_stepper(MOTOR_STEPS, bottom_DIR, bottom_STEP, bottom_S
 MultiDriver controller(top_stepper, bottom_stepper);
 
 void setup() {    
-    Serial.begin(9600);
+    Serial.begin(115200);
     Serial.setTimeout(10);
     top_stepper.begin(RPM, MICROSTEPS);
     bottom_stepper.begin(RPM, MICROSTEPS);    
@@ -69,59 +69,81 @@ void setup() {
 
 void single_step(int direct, long encoder_reading, unsigned int encoder_setpoint) {    
     
-    top_stepper.setRPM(60);
-    bottom_stepper.setRPM(60);
-           
-    controller.rotate(-12.0*direct, -12.0*direct);           
+    top_stepper.setRPM(120);
+    bottom_stepper.setRPM(120);
+
+    top_stepper.enable();
+    bottom_stepper.enable(); 
+
+    // make step
+    controller.rotate(-12.0*direct, 12.0*direct);   
+
+    // correct for tension
+    int i=0;
+    while (encoder_reading<encoder_setpoint*0.95 || encoder_reading>encoder_setpoint*1.05) {
+      if (encoder_reading<encoder_setpoint*0.95) {      
+        if (direct == 1) {
+          bottom_stepper.rotate(0.6);         
+        } else {
+          top_stepper.rotate(0.6);
+        }
+        if (myEnc.read() <= encoder_reading) {
+          i = i+1; // Could not increase tension at this step. When i>=5, break loop.
+        }
+      }    
+                  
+      if (encoder_reading>encoder_setpoint*1.05) {                  
+        if (direct == 1) {
+          top_stepper.rotate(-0.6);                    
+        } else {
+          bottom_stepper.rotate(-0.6);          
+        }             
+        if (myEnc.read() >= encoder_reading) {
+          i = i+1; // Could not release tension at this step. When i>=5, break loop.
+        }     
+      }      
+      encoder_reading = myEnc.read();     
+      
+      if (i>=100) {
+        // Error! Cannot set tension properly. Perhaps the motors are not working, tape is torn or end of tape?
+        break;
+      }
+    }      
     
-    if (encoder_reading<encoder_setpoint*0.9) {
-      while (encoder_reading<encoder_setpoint) {      
-        encoder_reading = myEnc.read();        
-        if (direct == 1) {
-          bottom_stepper.rotate(-3.6);         
-        } else {
-          top_stepper.rotate(3.6);
-        }
-      }
-    }
-
-    else if (encoder_reading>encoder_setpoint*1.1) {
-            
-      while (encoder_reading>encoder_setpoint) {                  
-        if (direct == 1) {
-          top_stepper.rotate(-1.2);                    
-        } else {
-          bottom_stepper.rotate(1.2);          
-        }
-        long new_encoder_reading = myEnc.read();                
-        if (new_encoder_reading < encoder_reading * 1.1) {
-          encoder_reading = new_encoder_reading; // Tension was properly released
-          EOT = false;
-        } else {
-          // End of tape reached          
-          EOT = true;
-          break;
-        }        
-      }
-    }
-
-    else {
-      EOT = false;
-    }
 }
 
 void ff_step(int direct) {
+  
+    top_stepper.setRPM(120);        
+    bottom_stepper.setRPM(120);        
         
     if (direct == -1) {     
       top_stepper.enable();
-      bottom_stepper.disable();    
-      top_stepper.rotate(3.6);        
+      //bottom_stepper.disable();    
+      top_stepper.rotate(30);
+      /*if (myEnc.read() > 20000) {
+        top_stepper.disable();
+        
+        bottom_stepper.enable();
+        bottom_stepper.rotate(45);
+        bottom_stepper.disable();
+        
+                
+      }*/
     
     } else if (direct == 1) {         
       bottom_stepper.enable();      
-      top_stepper.disable();    
-      bottom_stepper.rotate(-3.6);    
-    }    
+      //top_stepper.disable();    
+      bottom_stepper.rotate(30);
+      /*if (myEnc.read() > 20000) {
+        
+        /*bottom_stepper.disable();
+        
+        top_stepper.enable();
+        top_stepper.rotate(45);
+        top_stepper.disable();
+      }*/
+    }
 }
 
 void release_tension() {
@@ -135,9 +157,8 @@ void release_tension() {
     encoder_reading_before = myEnc.read();
     controller.rotate(-1, 1);   
     encoder_reading_after = myEnc.read();    
-  } 
+  }   
   
-  //controller.rotate(-30, 30);
   top_stepper.disable();
   bottom_stepper.disable();
   myEnc.readAndReset();  
@@ -149,7 +170,7 @@ void loop() {
     
     long encoder_reading = myEnc.read();
     String transmit_response = ""; 
-    transmit_response = transmit_response + encoder_reading + "," + EOT;
+    transmit_response = transmit_response + encoder_reading + ",";
     Serial.println(transmit_response);   
     
     if (Serial.available()) {      
@@ -177,18 +198,14 @@ void loop() {
       // Deal with command
       
       if (cmd == "ff_step") {
-        fast_forward = true;
-        top_stepper.setRPM(120);        
-        bottom_stepper.setRPM(120);        
+        fast_forward = true;        
       }
 
-      else if (cmd == "single_step") {
-        top_stepper.enable();
-        bottom_stepper.enable();       
+      else if (cmd == "single_step") { 
         
         single_step(direct, encoder_reading, encoder_setpoint);
-
         fast_forward = false;        
+        
       }
       else if (cmd == "stop") {
         top_stepper.disable();
@@ -200,12 +217,17 @@ void loop() {
       }
     }
 
-    else if (fast_forward && !EOT) {      
+    /*else if (fast_forward && !EOT) {      
       if ( ((encoder_reading > 35000) and (direct==1)) or ((encoder_reading > 25000) and (direct==-1)) ) {
         EOT = true;
       } else {
         ff_step(direct);
       }
+    }*/
+
+    else if (fast_forward) {
+      ff_step(direct);
     }
+    
       
 }
