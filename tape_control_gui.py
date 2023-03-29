@@ -28,9 +28,9 @@ def read_arduino():
     time.sleep(5)
     
 
-ser = serial.Serial('COM4', 9600)
+ser = serial.Serial('COM9', 115200)
 
-sg.theme('Dark Amber')  # Let's set our own color theme
+sg.theme('Reddit')  # Let's set our own color theme
 
 # STEP 1 define the layout
 layout = [ 
@@ -41,13 +41,13 @@ layout = [
             [sg.Text("Tape tension: ", size=(12,1)), sg.Text(size=(6,1), key='-TENSION READ-'), sg.Button('Release tension', key='-RELEASE TENSION-')],
             [sg.Text('Arduino status: ', size=(12,1)), sg.Text(size=(12,1), key='-ARDUINO STATUS-')],            
             [sg.Text("Tape status: ", size=(12,1)), sg.Text(size=(12,1), key='-TAPE STATUS-')],
+            #[sg.Text("Motor X temperature: ", size=(12,1)), sg.Text(size=(12,1), key='-MOTOR X TEMP-')],
             [sg.Button('Go', key='-GO-'), sg.Button('Stop', key='-STOP-')],                        
             [sg.Button('Exit', key = '-EXIT-')]
          ]
 
 #STEP 2 - create the window
 window = sg.Window('Tape control', layout)
-
 
 # STEP3 - the event loop
 comm_loss = 0
@@ -61,19 +61,20 @@ while True:
         ard_response = ard_response[2:][:-5]
         ard_response = ard_response.split(",")    
         tension_read = ard_response[0]
-        EOT = ard_response[1]    
+        #EOT = ard_response[1]    
         ser.reset_input_buffer()
         ard_status = 'OK'
         tape_status = 'READY'
         comm_loss = 0
+        tempX = ard_response[2]
         
     except:
         comm_loss += 1
-        if comm_loss > 1:
-            ard_status = 'COMM LOST!'                
+        if comm_loss > 2:
+            ard_status = 'COMM LOST'                
     
-    if EOT=='1':
-        ard_status = 'END OF TAPE!'
+    #if EOT=='1':
+    #    ard_status = 'END OF TAPE'
     
     try:
         if fast_forward:
@@ -83,8 +84,9 @@ while True:
     
     window['-TENSION READ-'].update(tension_read)       
     window['-ARDUINO STATUS-'].update(ard_status)       
-    window['-TAPE STATUS-'].update(tape_status)       
-    window['-STEP COUNTER-'].update(step_counter)       
+    #window['-TAPE STATUS-'].update(tape_status)       
+    window['-STEP COUNTER-'].update(step_counter)
+    #window['-MOTOR X TEMP-'].update(tempX)
     
     #print(event, values)
     
@@ -142,10 +144,7 @@ while True:
         else:
             ser.write(b'stop::')    
         
-        window['-TAPE STATUS-'].update(tape_status)       
-
-        
-        
+        window['-TAPE STATUS-'].update(tape_status)              
         
 ser.close()
 window.close()
